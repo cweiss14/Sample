@@ -1,0 +1,153 @@
+##Hands on Project Script
+
+getwd()
+setwd("C:/Users/Cweis/OneDrive/Desktop/MachineLearning")
+load("Reuters.Rdata")
+
+library(tm)
+library(SentimentAnalysis)
+library(dplyr)
+
+
+
+##Pre-Processing
+
+removeURL <- function(x) gsub("http[^[:space:]]*", "", x)
+removeNonWords <- function(x) gsub("[^a-zA-Z]+", " ", x)
+
+
+corpus <- Corpus(DataframeSource(reuters.train))
+corpus <- tm_map(corpus, removeURL)
+corpus <- tm_map(corpus, removeNonWords)
+corpus <- tm_map(corpus, removeNumbers)
+corpus <- tm_map(corpus, tolower)
+corpus <- tm_map(corpus, removePunctuation)
+corpus <- tm_map(corpus, removeWords, stopwords("english"))
+corpus <- tm_map(corpus, stemDocument)
+
+
+## Making Document term matrix
+
+dtm <- DocumentTermMatrix(corpus)
+
+
+#18119 Words before adjusting sparsity --- Question 1
+
+## Removing sparsity
+
+dtm1 <- removeSparseTerms(dtm, sparse = 0.98)
+
+# 1645 terms remain --- Question 2
+
+## Finding three most frequent words
+
+dtm1.df <- as.data.frame(as.matrix(dtm1))
+freq.dtm <- sort(colSums(dtm1.df),decreasing=TRUE)
+head(freq.dtm)
+
+ # said (19856), year (7041), will (5943). --- Question 3
+
+## Question four 
+
+colSums(dtm1.df)
+
+setwd("C:/Users/Cweis/OneDrive/Desktop/MachineLearning/HandsOnProject")
+
+liu.pos.words <- scan("./positive-words.txt", 
+                      what = "character", 
+                      comment.char = ";", encoding = "UTF-8")
+
+liu.pos.words
+
+liu.neg.words <- scan("./negative-words.txt", 
+                      what = "character", 
+                      comment.char = ";", encoding = "UTF-8")
+liu.pos.scores <- rep(1, length(liu.pos.words))
+liu.neg.scores <- rep(-1, length(liu.neg.words))
+liu.lexicon <- c(liu.pos.words, liu.neg.words)
+liu.scores <- c(liu.pos.scores, liu.neg.scores)
+
+words0 <- str_split(dtm1$dimnames$Terms, '\\s+')
+words0
+
+words <- unlist(words0)
+words
+
+positive <- sum(!is.na(match(words, liu.pos.words)))
+negative <- sum(!is.na(match(words, liu.neg.words)))
+positive
+negative
+
+match(words, liu.neg.words)
+liu.neg.words[[4363]]
+words[[5]]
+match(liu.neg.words[[4363]], words[[5]])
+
+score <- positive - negative
+score
+
+# More Positive than Negative --- Question Four
+
+## New DTM
+dtm3 <- removeSparseTerms(dtm, sparse = 0.75)
+
+## Creating dtm.reuters2
+dtm.reuters2 <- as.data.frame(as.matrix(dtm3))
+
+## Question Five
+library(qgraph)
+
+cor.reuters <- cor_auto(dtm.reuters2, forcePD = TRUE)
+some <- centrality(cor.reuters)
+sort(some$Closeness, decreasing = TRUE)
+
+# Analyst --- Question Five
+
+## Question Six
+library(EGAnet)
+
+ega1 <- EGA(data = cor.reuters, model = "glasso", n=nrow(dtm.reuters2), algorithm = "walktrap",
+                uni.method = "expand")
+
+# Dimension number three seems to represent stocks and online trading --- Question Six
+
+## Question Seven
+
+ega2 <- EGA(data = cor.reuters, model = "TMFG", n=nrow(dtm.reuters2), algorithm = "walktrap",
+            uni.method = "expand")
+
+# there are 10 topics; topic number four, in orange, seems to be related to sales and revenue --- Queston Seven
+
+## Question Eight
+
+library(emoxicon)
+
+emotions <- emoxicon(text = reuters.train$text, lexicon = emotions)
+emotions_author <- as.data.frame(cbind(emotions, reuters.train$Author))
+
+
+Q8 <- emotions_author %>% filter(grepl('AlanCrosby|KevinDrawbaugh|DarrenSchuettler|SarahDavison', reuters.train$Author))
+
+library(data.table)
+
+setDT(Q8)
+Q8 [,list(mean=mean(HAPPY)),by=`reuters.train$Author`]
+
+# Alan Crosby has the highest mean happiness score - 13.42. --- Question 8
+
+emotionsOnly <- cbind.data.frame(Q8$AFRAID,Q8$AMUSED,Q8$ANGRY,Q8$ANNOYED,Q8$DONT_CARE,Q8$HAPPY,Q8$INSPIRED,Q8$SAD,Q8$`reuters.train$Author`)
+
+colnames(emotionsOnly)[1]="Afraid"
+colnames(emotionsOnly)[2]="Amused"
+colnames(emotionsOnly)[3]="Angry"
+colnames(emotionsOnly)[4]="Annoyed"
+colnames(emotionsOnly)[5]="Dont_Care"
+colnames(emotionsOnly)[6]="Happy"
+colnames(emotionsOnly)[7]="Inspired"
+colnames(emotionsOnly)[8]="Sad"
+colnames(emotionsOnly)[9]="Author"
+
+emotionsScaled <- emotionsOnly %>% group_by(Author) %>% mutate(Afraid = scale(Afraid), Amused = scale(Amused), Angry = scale(Angry), Annoyed = scale(Annoyed), Dont_Care = scale(Dont_Care), Happy = scale(Happy), Inspired = scale(Inspired), Sad = scale(Sad))
+
+setDT(emotionsScaled)
+emotionsScaled [,list(mean=mean(Happy)),by="Author"]
