@@ -1,0 +1,317 @@
+## Kaggle Competition Training
+
+# Loading Training Data:
+
+setwd("C:/Users/Cweis/OneDrive/Desktop/MachineLearning/FinalProject")
+fulldata <- load("full.data.Rdata")
+
+
+#### Predictive Analysis Using the training set:
+
+# Text Mining:
+
+library(tm)
+removeURL <- function(x) gsub("http[^[:space:]]*", "", x)
+removeNonWords <- function(x) gsub("[^a-zA-Z]+", " ", x)
+
+corpus <- Corpus(DataframeSource(full.data))
+corpus <- tm_map(corpus, removeURL)
+corpus <- tm_map(corpus, tolower)
+corpus <- tm_map(corpus, removePunctuation)
+corpus <- tm_map(corpus, removeNumbers)
+corpus <- tm_map(corpus, removeNonWords)
+corpus <- tm_map(corpus, removeWords, stopwords("english"))
+
+
+for(i in 1:length(corpus)){
+  full.data$text.tm[i] <- strwrap(corpus[[i]], width = 10000)
+}
+
+
+corpus <- tm_map(corpus, stemDocument)
+
+drugs.dtm <- DocumentTermMatrix(corpus)
+
+drugs.dtm2 <- removeSparseTerms(drugs.dtm, 0.95)
+
+drugs.final <- as.data.frame(as.matrix(drugs.dtm2))
+
+
+# Emoxicon:
+library(emoxicon)
+emoxicon.scores <- emoxicon(text = full.data$text.tm, lexicon = emotions)
+
+full.data2 <- data.frame(full.data,  emoxicon.scores[,-c(1,2)])
+colnames(full.data2)
+head(full.data2)
+
+# EGA:
+
+library(EGAnet)
+library(qgraph)
+ega.drugs.tmfg <- EGA(drugs.final, model = "TMFG")
+plot(ega.drugs.tmfg)
+
+# Cluster Scores:
+scores.drugs <- net.scores(drugs.final, A = ega.drugs.tmfg$network, wc = ega.drugs.tmfg$wc, impute = FALSE)
+colnames(scores.drugs$std.scores) <- paste0("Topic", 1:ncol(scores.drugs$std.scores))
+
+full.data2 <- data.frame(full.data2, scores.drugs$std.scores)
+head(full.data2)
+
+# Sent Analysis package:
+
+library(SentimentAnalysis)
+sent.analysis2 <- analyzeSentiment(full.data2$text.tm)
+head(sent.analysis2)
+head(full.data)
+full.data2 <- data.frame(full.data2, sent.analysis2)
+colnames(full.data2)
+head(full.data2)
+
+# Separating Training and Testing:
+training.data <- full.data2[which(full.data2$DataGroup=="Training"),]
+testing.data <- full.data2[which(full.data2$DataGroup=="Testing"),]
+
+### CARET:
+library(caret)
+
+# Creating a Training and Testing set using the Training.data object:
+Index <- createDataPartition(training.data$rating, p = .8, 
+                             list = FALSE)
+
+training <- training.data[Index,]
+testing <- training.data[-Index,]
+
+
+colnames(training)
+# Removing DataGroup and text.tm:
+training <- training[,c(3:7,10:40)]
+
+## Using the caret package:
+fitControl <- trainControl(## 5-fold CV
+  method = "repeatedcv",
+  number = 5,
+  ## repeated 5 times
+  repeats = 5)
+
+# Linear Model using only the emotion scores:
+colnames(training)
+fit.lm0 <- train(rating ~ ., data = training[,c(1,6:13)], 
+                 method = "lm",
+                 trControl = fitControl)
+
+
+summary(fit.lm0)
+pred.lm0 <- predict(fit.lm0, newdata = testing)
+postResample(pred = pred.lm0, obs = testing$rating)  
+
+#RMSE = .98
+
+# Linear Model using all the predictors:
+colnames(training)
+fit.lm1 <- train(rating ~ ., data = training, 
+                 method = "lm",
+                 trControl = fitControl)
+
+
+summary(fit.lm1)
+pred.lm1 <- predict(fit.lm1, newdata = testing)
+postResample(pred = pred.lm1, obs = testing$rating)
+
+# RMSE = 0.8868
+
+#Linear Model using highest correlations: UsefulCount, Topic4, SentimentGI, NegativityGI, SentimentHE,
+#RatioUncertaintyLM, SentimentQDAP
+
+lmCor <- train(rating ~ ., data = training[,c(1,2,25,26,28,34,35)], 
+                  method = "lm",
+                  trControl = fitControl)
+
+
+summary(lmCor)
+lmCor <- predict(lmCor, newdata = testing)
+postResample(pred = lmCor, obs = testing$rating)
+
+## Plotting RMSE
+
+resamps <- resamples(list(LinearModel_Emotions = fit.lm0,
+                          LinearModel_All = fit.lm1))
+
+trellis.par.set(caretTheme())
+
+dotplot(resamps, metric = "RMSE")
+
+pred.lm1.sub <- predict(fit.lm1, newdata = testing.data)
+
+
+
+################## MODEL CREATION AND TESTING
+
+
+# Stepwise AIC selection for all predictors:
+library(MASS)
+
+colnames(training)
+fit.lm3 <- train(rating ~ ., data = training, 
+                 method = "glmStepAIC",
+                 trControl = fitControl)
+
+fit.lm3$results
+fit.lm3$finalModel
+
+summary(fit.lm3)
+pred.lm3 <- predict(fit.lm3, newdata = testing)
+postResample(pred = pred.lm3, obs = testing$rating)
+
+# RMSE = 0.8857
+
+## Stepwise AIC selection for EGA:
+
+library(MASS)
+
+colnames(training)
+fit.lm4 <- train(rating ~ ., data = training[,c(1,14:23)], 
+                 method = "glmStepAIC",
+                 trControl = fitControl)
+
+fit.lm4$results
+fit.lm4$finalModel
+
+summary(fit.lm4)
+pred.lm4 <- predict(fit.lm4, newdata = testing)
+postResample(pred = pred.lm4, obs = testing$rating)
+
+# RMSE = 0.9649
+
+## and once more for emoticon?
+
+library(MASS)
+
+colnames(training)
+fit.lm5 <- train(rating ~ ., data = training[,c(1,6:13)], 
+                 method = "glmStepAIC",
+                 trControl = fitControl)
+
+fit.lm5$results
+fit.lm5$finalModel
+
+summary(fit.lm5)
+pred.lm5 <- predict(fit.lm5, newdata = testing)
+postResample(pred = pred.lm5, obs = testing$rating)
+
+# RMSE = 0.9860
+
+
+## xgBoost 
+library(xgboost)
+
+fit.xgB1 <- train(rating ~ ., data = training, method = "xgbTree", trControl = fitControl, verbose = FALSE, tuneLength = 10)
+
+system.time({fit.xgB1 <- train(rating ~ ., data = training, method = "xgbTree", trControl = fitControl, verbose = FALSE, tuneLength = 10)
+})
+
+pred.xgB1 <- predict(fit.xgB1, newdata = testing)
+postResample(pred = pred.xgB1, obs = testing$rating)
+
+# RMSE = 0.9025......smh
+
+## xgBoost tree for Usefulcount & ega
+
+fit.xgB2 <- train(rating ~ ., data = training[,c(1,2,14:23)], method = "xgbTree", trControl = fitControl)
+
+pred.xgB2 <- predict(fit.xgB2, newdata = testing)
+postResample(pred = pred.xgB2, obs = testing$rating)
+
+#RMSE = 0.949
+########### Boosted Tree w/ useful count and EGA
+colnames(training)
+
+library(partykit)
+
+
+fit.boostedTree <- train(rating ~ ., data = training[,c(1,2,14:23)], method = "blackboost", trControl= fitControl, metric = "RMSE")
+
+pred.boostedTree <- predict(fit.boostedTree, newdata = testing)
+postResample(pred = pred.boostedTree, obs = testing$rating)
+
+#RMSE = 0.94
+
+############ Random Forest
+install.packages("party")
+library(party)
+fit.RF <- train(rating ~ ., data = training[,c(1,2,14:23)], method = "cforest", trControl= fitControl)
+
+pred.RF <- predict(fit.RF, newdata = testing)
+postResample(pred = pred.RF, obs = testing$rating)
+
+#RMSE = 0.94
+ 
+
+
+#### This was the best so far: working with it.
+
+# with the final model from stepwise
+library(MASS)
+
+colnames(training)
+fit.lm4 <- train(rating ~ ., data = training[,c(1,2,3,4,5,6,7,9,10,13,14,15,17,20,21,22,23,24,26,28,35)], method = "lm", trControl = fitControl)
+
+fit.lm3$results
+fit.lm3$finalModel
+
+summary(fit.lm4)
+pred.lm4 <- predict(fit.lm4, newdata = testing)
+postResample(pred = pred.lm4, obs = testing$rating)
+
+##FinalModelStepwise with other models: gbm
+
+fit.gbm <- train(rating ~ ., data = training[,c(1,2,3,4,5,6,7,9,10,13,14,15,17,20,21,22,23,24,26,28,35)], method = "gbm", trControl = fitControl)
+
+pred.gbm <- predict(fit.gbm, newdata = testing)
+postResample(pred = pred.gbm, obs = testing$rating)
+
+
+####
+
+########Stack Modeling? Using GBM, Linear, and xgboost
+
+##GBM
+fit.gbm1 <- train(rating ~ ., data = training[,c(1,2,3,4,5,6,7,9,10,13,14,15,17,20,21,22,23,24,26,28,35)], method = "gbm", trControl = fitControl)
+
+pred.gbm1 <- predict(fit.gbm1, newdata = testing)
+postResample(pred = pred.gbm, obs = testing$rating)
+
+###Linear
+
+fit.lm5 <- train(rating ~ ., data = training[,c(1,2,3,4,5,6,7,9,10,13,14,15,17,20,21,22,23,24,26,28,35)], 
+                 method = "lm",
+                 trControl = fitControl)
+
+pred.lm5 <- predict(fit.lm5, newdata = testing)
+postResample(pred = pred.lm1, obs = testing$rating)
+
+###xgboost tree
+
+fit.xgB3 <- train(rating ~ ., data = training[,c(1,2,3,4,5,6,7,9,10,13,14,15,17,20,21,22,23,24,26,28,35)], method = "xgbTree", trControl = fitControl)
+
+pred.xgB3 <- predict(fit.xgB3, newdata = testing)
+postResample(pred = pred.xgB2, obs = testing$rating)
+
+# Stacking the model and creating a new data frame
+
+stack_model <- data.frame(pred.lm5, pred.gbm1, pred.xgB3, rating = testing$rating)
+
+meta_model <- train(rating ~ ., data = stack_model, method = "lm", trControl = fitControl)
+
+# Prediction?
+pred.meta <- predict(meta_model, newdata = testing)
+postResample(pred = pred.meta, obs = testing$rating)
+
+
+
+# Submission Example:
+pred.gbm.sub <- predict(fit.gbm1, newdata = testing.data)
+
+GBM.SUB<- data.frame(doc_id = testing.data$doc_id, Prediction1 = pred.gbm.sub)
+write.csv(GBM.SUB, "Submission_1.csv", row.names = FALSE)
