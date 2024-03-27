@@ -1,0 +1,188 @@
+getwd()
+setwd("C:/Users/Cweis/OneDrive/Desktop")
+data <- read.csv("SHHWJTerm.csv")
+#####
+library(ggplot2)
+library(truncnorm)
+library(psych)
+library(car)
+library(Publish)
+library(plotrix)
+library(WebPower)
+library(dplyr)
+
+## Model 1 - WFH Q8a, Screen Time Q25, 25a, Movement and Exercise
+
+##DV Bedtime
+
+describe(data)
+
+sum(data$Q25_ScreenTime_Have.you.had.more.around.bedtime.)
+describe(data$Q25_ScreenTime_Have.you.had.more.around.bedtime.)
+Hi <- table(data$Q25_ScreenTime_Have.you.had.more.around.bedtime.)
+data.frame(hi)
+
+df1 <- data.frame(data$Q25_ScreenTime_Have.you.had.more.around.bedtime.)
+summary(df1)
+as.numeric(df1)
+
+df2 <- data.frame(data$Q26a_Movement.exercise_How.have.habits.changed.)
+table(df2)
+
+df4 <- df3[!apply(df3 == "", 1, all), ]
+df3 <- data.frame(data$Q8a_Which.week.in.March.2020.did.you.start.working.from.home.)
+describe(df3)
+df5 <- data.frame(df4)
+
+describe(df5)
+
+df1.1 <- df1[!apply(df1 == "", 1, all), ]
+df1.2 <- data.frame(df1.1)
+describe(df1.2)
+
+df9 <- data.frame( data$Q25_ScreenTime_Have.you.had.more.around.bedtime., data$Q26a_Movement.exercise_How.have.habits.changed.)
+#####
+
+ggplot(df9, aes(x = data.Q25_ScreenTime.have.you.had.more.around.bedtime., data.Q26a_Movement.exercise_How.have.habits.changed.)) + scale_x_discrete(labels =c("Yes","No", "I am exercising/moving more","I am exercising/moving less"))
+ggplot(df9)
+
+counts <- table(data$Q25_ScreenTime_Have.you.had.more.around.bedtime.)
+barplot(counts, main = "Screentime Distribution", horiz = TRUE, names.arg =c("Yes","No") xlab = "Yes","no")
+
+
+
+mean(data$Q25a_ScreenTime_How.much.more.you.have.been.exposed.to.before.bed_est..)
+
+
+data$contrasts <- Recode(data$Q25a_ScreenTime_How.much.more.you.have.been.exposed.to.before.bed_est..,
+                                      "'0-0.5 hour' = 2;
+                                      '0.51-1 hour' = -1;
+                                     '1-2 hours' = 0;
+                                   '2-3 hours' = -2;
+                               '3+ hours' = 1;",
+                                      as.numeric=TRUE)
+mean(data$Q25a_ScreenTime_How.much.more.you.have.been.exposed.to.before.bed_est..)
+
+dfx <- data.frame(data$Q13_Sleep.Approx.hrs.on.avg.work.night.in.the.last.week.)
+df1.5 <- dfx[!apply(dfx == "", 1, all), ]
+df1.6 <- data.frame(df1.5)
+describe(df1.6)
+
+
+df2 <- data.frame(data$Q26a_Movement.exercise_How.have.habits.changed.)
+table(df2)
+
+dfx
+describe(dfx, na.rm = TRUE)
+df1 <- data.frame(data$Q25a_ScreenTime_How.much.more.you.have.been.exposed.to.before.bed_est..)
+df1. <- df1[!apply(df1 == "", 1, all), ]
+df1.2 <- data.frame(df1.)
+
+describe(df1.2)
+summary(df1.2)
+table(df1.2)
+
+gsub("0.51 <96> 1 hour","0.51-1 hour",data$Q24_NewsOrSocialMedia_COVID.19.related_How.many.hrs.consumed.on.avg.per.day.)
+
+df24 <- data.frame(data$Q24_NewsOrSocialMedia_COVID.19.related_How.many.hrs.consumed.on.avg.per.day.)
+
+df24 <- rename(0.51 <96> 1 hour = 0.51 - 1 hour)
+
+> xx <- df24[!apply(df24 == "", 1, all), ]
+> df24.1 <- data.frame(xx)
+> describe(df24.1)
+
+IQR(data$Q8a_Which.week.in.March.2020.did.you.start.working.from.home.)
+
+
+df1.2 %>% mutate(result=recode(result,'0-0.5 hour' ='1','0.51-1 hour'='2', '1-2 hours'='3','2-3 hours'='4', '3+ hours'='5'))
+
+data
+#######################################
+
+
+data1 <- cbind(data$Q29a_Mood_HowHasMoodChg_7REC,data$Q1_Age,
+               data$Q10_WorkFixHomeSched_N.Y.REC,
+               data$Q8_WorkMostFromHomeNow_N.Y.REC,
+               data$Q8a_Which.week.in.March.2020.did.you.start.working.from.home.,
+               data$Q11_ChildrenHomeFromSchool_N.Y.REC,
+               data$Q14_WorkNoHrsPerWkChg_N.Y.REC,
+               data$Q12_Sleep.Approx.hrs.on.avg.work.night.in.January.2020.,
+               data$Q13_Sleep.Approx.hrs.on.avg.work.night.in.the.last.week.,
+               data$Q15_WorkSchedHaveYouVaried_N.Y.REC,
+               data$Q16_SleepPattChg_N.Y.REC,
+               data$Q18_AlcoholAmtChg_N.Y.REC,
+               data$Q23_News_Has.amount.you.are.consuming.increased.since.end.of.Feb..2020.,
+               data$Q25_ScreenTime_HaveYouHadMoreNearBedtime_N.Y.REC,
+               data$Q26_MoveExerHaveYouChg_2REC,
+               data$Q26a_Movement.exercise_How.have.habits.changed.,
+               data$Q27_DietHasQualChg_N.Y.REC,
+               data$Q28_FoodAmtPerDayHasItChg_N.Y.REC)
+
+colnames(data1) <- c('mood','age','workFixed', 'WFH','WhatWFH', 'Child','workhrs','sleephrsJan','sleephrsLastWeek','worksche',
+                     'sleepPat','alcohol','socialMedia', 'screenTime','Exercise', 'ExerciseChange', 'Diet','foodamt')
+
+data1$ExerciseChange <- recode(data1$ExerciseChange,	
+'I am exercising/moving less' = 0,
+'I am exercising/moving more' = 1)
+
+data1$WhatWFH <- recode(data1$WhatWFH,
+                        'Week 1 March 1-7'=1,
+                        'Week 2 March 8-14'=2,
+                        'Week 3 March 15-21'=3,
+                        'Week 4 March 22-28'=4,
+                        'Week 5 March 29- April 4'=5)
+data1 <- data.frame(data1)
+
+mis.row <- NULL
+for(i in 1:848){
+  for(j in 1:14){
+    if(is.na(data1[i,j])){mis.row <- c(mis.row,i)}
+  }
+}
+length(unique(mis.row))
+data1 <- data1[-unique(mis.row),]
+
+describe(data$Q13_Sleep.Approx.hrs.on.avg.work.night.in.the.last.week.)
+
+# Model 1 R^2
+
+model1 <- lm(data$Q13_Sleep.Approx.hrs.on.avg.work.night.in.the.last.week. ~ data$Q8a_Which.week.in.March.2020.did.you.start.working.from.home. + data$Q26a_MoveExerHowHaveHabChg_2REC + data$Q27a_DietowHasChg_2REC, data = data)
+summary(model1)
+
+#Model 1.1
+
+
+
+model.1 <- lm(sleephrsLastWeek~.,data=data1)
+summary(model.1)
+
+
+backward <- stepAIC(model.1,direction="backward",trace=FALSE)
+backward$anova
+
+model1.1 <- lm(data$Q13_Sleep.Approx.hrs.on.avg.work.night.in.the.last.week. ~ data$Q28_FoodAmtPerDayHasItChg_N.Y.REC + data$Q11_ChildrenHomeFromSchool_N.Y.REC + data$Q15_WorkSchedHaveYouVaried_N.Y.REC, data = data)
+summary(model1.1)
+
+
+#Model1.2
+
+model1.2 <- lm(sleephrsLastWeek~ sleephrsJan + mood + WFH, data = data1)
+summary(model1.2)
+
+
+ #Model2
+colnames(data1)
+model2 <- lm(alcohol~ screenTime + age + socialMedia, data = data1)
+summary(model2)
+
+#Modified model 2
+model.2 <- lm(alcohol~sleephrsJan + Diet + age,data=data1)
+summary(model.2)
+
+
+#Model3
+
+colnames(data1)
+model3 <- lm(ExerciseChange~,data=data1)
+summary(model3)
